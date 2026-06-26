@@ -1,0 +1,9 @@
+services:
+  tgform:
+    image: ghcr.io/enoti4ka44/tgform:latest
+    container_name: tgform
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-3000}:3000"

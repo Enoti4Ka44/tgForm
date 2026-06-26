@@ -1,0 +1,76 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Deploy to server over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -e
+            mkdir -p /opt/tgform
+            cd /opt/tgform
+
+            cat > docker-compose.yml <<'EOF'
+            services:
+              tgform:
+                image: ghcr.io/${{ github.repository }}:latest
+                container_name: tgform
+                restart: unless-stopped
+                env_file:
+                  - .env
+                ports:
+                  - "${PORT:-3000}:3000"
+            EOF
+
+            cat > .env <<EOF
+            PORT=${{ secrets.PORT }}
+            TG_BOT_TOKEN=${{ secrets.TG_BOT_TOKEN }}
+            TG_CHAT_ID=${{ secrets.TG_CHAT_ID }}
+            ALLOWED_ORIGIN=${{ secrets.ALLOWED_ORIGIN }}
+            EOF
+
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose pull
+            docker compose up -d
+            docker image prune -f
