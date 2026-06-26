@@ -28,10 +28,10 @@ app.post("/api/send-form", async (req, res) => {
   }
 
   const tgMessage =
-    `🔥 *Новая заявка* \n\n` +
-    `*Имя:* ${name}\n` +
-    `*Контакт:* ${phone}\n\n` +
-    `*Сообщение:* ${message || "—"}`;
+    `#new\n\n` +
+    `Имя: ${name}\n` +
+    `Контакт: ${phone}\n\n` +
+    `Сообщение: ${message || "—"}`;
 
   try {
     const botToken = process.env.TG_BOT_TOKEN;
